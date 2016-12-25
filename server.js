@@ -11,6 +11,10 @@ const {logger} = require('./utilities/logger');
 // these are custom errors we've created
 const {FooError, BarError, BizzError} = require('./errors');
 
+const {ALERT_FROM_EMAIL, ALERT_FROM_NAME, ALERT_TO_EMAIL} = process.env;
+
+const {sendEmail} = require('./emailer');
+
 const app = express();
 
 // this route handler randomly throws one of `FooError`,
@@ -21,6 +25,23 @@ const russianRoulette = (req, res) => {
     Math.floor(Math.random() * errors.length)]('It blew up!');
 };
 
+const sendErrorAlerts = (err, req, res, next) => {
+
+  if (err instanceof FooError || err instanceof BarError) {
+    logger.info(`Sending error alert email to ${ALERT_TO_EMAIL}`);
+
+    const emailData = {
+      from: ALERT_FROM_EMAIL,
+      to: ALERT_TO_EMAIL,
+      subject: `ALERT: a ${err.name} occured`,
+      text: `Error:\n\n${err.message}\n\n${err.stack}`
+    };
+    sendEmail(emailData);
+  }
+  next();
+}
+
+
 
 app.use(morgan('common', {stream: logger.stream}));
 
@@ -30,6 +51,8 @@ app.get('*', russianRoulette);
 // YOUR MIDDLEWARE FUNCTION should be activated here using
 // `app.use()`. It needs to come BEFORE the `app.use` call
 // below, which sends a 500 and error message to the client
+
+app.use(sendErrorAlerts);
 
 app.use((err, req, res, next) => {
   logger.error(err);
